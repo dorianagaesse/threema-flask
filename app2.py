@@ -25,6 +25,23 @@ CORS(app, resources={r"/*": {"origins": "*"}}, allow_headers="*")
 
 @app.route('/send_blocking', methods=['POST'])
 def send_message():
+    ThreemaUser = namedtuple('ThreemaUser', ['ID', 'PublicKey'])
+
+    destinator_public_key = {
+        'Florian': ThreemaUser('MB4UKY9B', 'public:9bef1d23f8e1915481d63c076a45036ea640c802d8a072bb3381dd9ff031c321'),
+        'Philipp': ThreemaUser('WBUFV2E5', 'public:'),
+    }
+
+    util.enable_logging(logbook.WARNING)
+    log_handler = logbook.more.ColorizedStderrHandler()
+
+    with log_handler.applicationbound():
+        # send_cached_key_blocking(connection, 'MB4UKY9B', 'public:9bef1d23f8e1915481d63c076a45036ea640c802d8a072bb3381dd9ff031c321', 'Python test')
+        out = send_blocking(destinator_public_key['Florian'], 'hkfdskjynv')
+        return jsonify(out), 200
+
+
+def send_blocking(to_threema_user, text):
     identity, secret, private = read_secrets('./secrets', '.threema_id', '.secret', '.private')
     # print(identity, secret, private)
 
@@ -37,15 +54,12 @@ def send_message():
         key=private,
         blocking=True,
     )
-
+    
     try:
         with connection:
-            send_cached_key_blocking(connection, 'MB4UKY9B', 'public:9bef1d23f8e1915481d63c076a45036ea640c802d8a072bb3381dd9ff031c321', 'Python test')
-            return jsonify({'status': 'ok'}), 200
+            send_cached_key_blocking(connection, to_threema_user.ID, to_threema_user.PublicKey, text)
     except GatewayError as exc:
-        print('Error:', exc)
-        return jsonify({'status': 'error'}), 500
-
+        print('Error:', exc, flush=True)
 
 def send_cached_key_blocking(connection, to_id, to_public_key, text):
     """
