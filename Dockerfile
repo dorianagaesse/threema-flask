@@ -4,6 +4,7 @@ WORKDIR /app
 COPY . /app
 
 RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install aiohttp
 
 # RUN pip install pynacl
 
@@ -13,4 +14,4 @@ RUN apt-get update && apt-get install -y libsodium23 && \
 
 EXPOSE 5000
 
-CMD [ "python", "app2.py" ]
+CMD [ "python", "app.py" ]
