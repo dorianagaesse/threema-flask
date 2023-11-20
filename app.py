@@ -58,14 +58,14 @@ def nonce_box_from_command(message, private_key, public_key):
 
 def command_message(message):
     private_key = 'private:33a5e5065124cf6ce4b5add58f8ff2acf8614fbfedd9eae7eb2db4824230e98d'
-    public_key = 'public:9bef1d23f8e1915481d63c076a45036ea640c802d8a072bb3381dd9ff031c321'
+    public_key = 'public:b8d6c992c5dcca27ef6fdaf13f1a8135d76c9f297b7fce2d6b5563cad52b6474'
     nonce_box = nonce_box_from_command(message, private_key, public_key)
 
     url = "https://msgapi.threema.ch/send_e2e"
 
     params = {
         'from': '*IPLIS00',
-        'to': 'MB4UKY9B',
+        'to': 'WBUFV2E5',
         'nonce': nonce_box[0],
         'box': nonce_box[1],
         'secret': 'mMlhsxWevz9wbOXT'
