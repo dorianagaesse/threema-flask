@@ -151,12 +151,19 @@ def send_message_sdk():
 @app.route('/send_message', methods=['POST'])
 def send_message():
     params = request.json
-    message = params.get('message')
-    print(f'message: {message}', flush=True)
 
-    # response = hardcoded_message()
-    # response = generated_message(message)
-    response = command_message(message)
+    _from = params.get('from')
+    recipient = params.get('to')
+    message = params.get('message')
+    recipientType = params.get('recipientType')
+
+    if recipientType == 'phone':
+        if recipient.startswith('+'):
+            recipient = recipient[1:]
+
+    # TODO call controller
+    # response = command_message(message)
+    response = threema_controller.send_message(_from, recipient, recipientType, message)
 
     print("Response Status Code:", response.status_code, flush=True)
     print("Response Content:", response.text, flush=True)
