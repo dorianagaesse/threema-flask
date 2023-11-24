@@ -153,25 +153,21 @@ def send_message():
     params = request.json
 
     _from = params.get('from')
-    recipient = params.get('to')
+    recipientList = params.get('to').split(',')
     message = params.get('message')
-    recipientType = params.get('recipientType')
 
-    if recipientType == 'phone':
-        if recipient.startswith('+'):
-            recipient = recipient[1:]
+    failed_recipients = threema_controller.send_message(_from, recipientList, message)
 
-    # TODO call controller
-    # response = command_message(message)
-    response = threema_controller.send_message(_from, recipient, recipientType, message)
 
-    print("Response Status Code:", response.status_code, flush=True)
-    print("Response Content:", response.text, flush=True)
-
-    if response.status_code in {200, 201}:
+    if not failed_recipients:
         return jsonify({'status': 'Message sent successfully.'}), 200
+    elif len(failed_recipients) > 0 and len(failed_recipients) < len(recipientList):
+        return jsonify({
+            'status': f'Message not sent to {", ".join(failed_recipients)}',
+            'failed_recipients': failed_recipients
+            }), 207
     else:
-        return jsonify({'status': 'Message sending failed.'}), 500
+        return jsonify({'status': 'Error while sending the message'}), 500
 
 
 if __name__ == '__main__':

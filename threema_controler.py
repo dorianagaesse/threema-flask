@@ -1,8 +1,10 @@
 import asyncio
 from collections import namedtuple
+from flask import make_response, jsonify
 import json
 import subprocess
 import requests
+import re
 
 from threema_service import ThreemaService
 
@@ -12,10 +14,18 @@ class ThreemaController:
         identity, secret, private_key = self.__read_secrets('./secrets', '.threema_id', '.secret', '.private')
         self.threema_service = ThreemaService(identity, secret, private_key)
 
+        self.secrets = self.Secrets(identity, secret, private_key)
+
         # Load Threema users
         self.users_json_path = 'threema_users.json'
         self.users = self.__load_users(self.users_json_path)
         self.url = 'https://msgapi.threema.ch'
+
+    class Secrets:
+        def __init__(self, identity, api_secret_key, private_key):
+            self.identity = identity
+            self.api_secret_key = api_secret_key
+            self.private_key = private_key
     
     def __read_secrets(self, secrets_folder, id_file, secret_file, private_file):
         with open(f'{secrets_folder}/{id_file}', 'r') as id_f:
@@ -54,10 +64,9 @@ class ThreemaController:
 
     def create_user(self, key_type, key):
         print(f'create user: {key_type} {key}', flush=True)
-        identity, secret, _ = self.__read_secrets('./secrets', '.threema_id', '.secret', '.private')
         params = {
-            'from': identity,
-            'secret': secret
+            'from': self.secrets.identity,
+            'secret': self.secrets.api_secret_key,
         }
 
         if key_type == 'id':
@@ -132,22 +141,40 @@ class ThreemaController:
             json.dump({'users': self.users}, file)
 
 
-    def send_message(self, from_id, recipient, key_type, message):
-        # check if from_id has a public key
-        # if so use its public key
-        # if not request service to query it
-        user = self.get_user_info(key_type, recipient)
+    def __get_recipient_type(self, recipient):
+        phone_number_pattern = re.compile(r'^(\+\d{11}|\d{11})$')
+        email_pattern = re.compile(r'^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}$')
+        account_id_pattern = re.compile(r'^[a-zA-Z0-9]{8}$')
 
-        _, secret, private_key = self.__read_secrets('./secrets', '.threema_id', '.secret', '.private')
+        # Check recipient against each pattern
+        if phone_number_pattern.match(recipient):
+            return 'phone'
+        elif email_pattern.match(recipient):
+            return 'email'
+        elif account_id_pattern.match(recipient):
+            return 'id'
+        else:
+            return 'unknown'
 
-        nonce, box = self.threema_service.nonce_box_from_command(message, private_key, user['public_key'])
+
+    def __send_message(self, from_id, user, message):
+        if user == None:
+            # The recipient corresponds to any known user
+            error_response = make_response(jsonify({'status': 'Recipient not found.'}), 404)
+            return error_response
+        
+        nonce, box = self.threema_service.nonce_box_from_command(
+            message, 
+            self.secrets.private_key,
+            user['public_key']
+        )
 
         params = {
             'from': from_id,
             'to': user['id'],
             'nonce': nonce,
             'box': box,
-            'secret': secret
+            'secret': self.secrets.api_secret_key
         }
 
         headers = {
@@ -158,6 +185,27 @@ class ThreemaController:
 
         print(f'params: {params}', flush=True)
         return requests.post(self.url + '/send_e2e', params=params, headers=headers)
+
+    def send_message(self, from_id, recipientList, message):
+        success_responses = []
+        failure_recipients = []
+
+        for recipient in recipientList:
+            recipientType = self.__get_recipient_type(recipient)
+            user = self.get_user_info(recipientType, recipient)
+
+            response = self.__send_message(from_id, user, message)
+
+            if response.status_code in {200, 201}:
+                success_responses.append({'recipient': recipient, 'status': 'Message successfully sent.'})
+            else:
+                failure_recipients.append(recipient)
+
+        print(f'success responses: {success_responses}', flush=True)
+        print(f'failure recipients: {failure_recipients}', flush=True)
+        return failure_recipients
+            
+
         
 
 
