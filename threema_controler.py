@@ -157,8 +157,9 @@ class ThreemaController:
             return 'unknown'
 
 
-    def __send_message(self, from_id, user, message):
+    def __send_e2e_message(self, from_id, user, message):
         if user == None:
+            # TODO: change this return to false or false, message
             # The recipient corresponds to any known user
             error_response = make_response(jsonify({'status': 'Recipient not found.'}), 404)
             return error_response
@@ -185,25 +186,28 @@ class ThreemaController:
 
         print(f'params: {params}', flush=True)
         return requests.post(self.url + '/send_e2e', params=params, headers=headers)
+ 
 
-    def send_message(self, from_id, recipientList, message):
+    def send_e2e_message(self, from_id, recipientList, message):
         success_responses = []
         failure_recipients = []
 
         for recipient in recipientList:
             recipientType = self.__get_recipient_type(recipient)
+            print(f'send_e2e_message -> recipientType: {recipientType}', flush=True)
             user = self.get_user_info(recipientType, recipient)
+            print(f'send_e2e_message -> user: {user}', flush=True)
 
-            response = self.__send_message(from_id, user, message)
+            response = self.__send_e2e_message(from_id, user, message)
 
             if response.status_code in {200, 201}:
-                success_responses.append({'recipient': recipient, 'status': 'Message successfully sent.'})
+                success_responses.append({'recipient': recipient, 'status_message': 'Message successfully sent.', 'status_code': response.status_code})
+            elif response.status_code == 404:
+                failure_recipients.append({'recipient': recipient, 'status_message': 'User does not exist.', 'status_code': response.status_code})
             else:
-                failure_recipients.append(recipient)
+                failure_recipients.append({'recipient': recipient, 'status_message': 'Message not sent.', 'status_code': response.status_code})
 
-        print(f'success responses: {success_responses}', flush=True)
-        print(f'failure recipients: {failure_recipients}', flush=True)
-        return failure_recipients
+        return success_responses, failure_recipients
             
 
         
